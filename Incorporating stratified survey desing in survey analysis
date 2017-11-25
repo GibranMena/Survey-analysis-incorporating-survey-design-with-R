@@ -1,0 +1,155 @@
+rm(list=ls())
+setwd("~")
+
+#################################################
+# Analyzing data with survey design             #            
+# 24/10/2017                                    #
+# Gibrán Mena                                   #
+#################################################
+
+install.packages("foreign")
+library(foreign)
+install.packages("survey")
+library(survey)
+
+setwd("~/Desktop/CIDE/Base por analizar/Inp")
+data <- read.dbf("TB_SEC_XII.dbf", as.is = T)
+
+
+#A1. Mujer casada o unida con pareja residente
+#A2. Mujer casada o unida con pareja ausente temporal
+#B1. Mujer separada o divorciada
+#B2. Mujer viuda
+#C1. Mujer soltera con novio o pareja o exnovio o expareja
+#C2. Mujer soltera que nunca ha tenido novio
+
+
+names(data) #Ver nombres de columna
+
+#data$P12_C_4
+# #1 - soltero?
+# 2 - casado o unido?
+# 3 - separado o divorciado?
+# 4 - viudo?
+# 8 - No sabe
+# b - blanco
+
+table(data$P12_C_4) #Crear tabla sólo con una variable, para explorar
+table(data$T_INSTRUM) #Crear tabla sólo con una variable, para explorar
+
+# A1. Mujer casada o unida con pareja residente
+# A2. Mujer casada o unida con pareja ausente temporal
+# B1. Mujer separada o divorciada
+# B2. Mujer viuda
+# C1. Mujer soltera con novio o pareja o exnovio o expareja
+# C2. Mujer soltera que nunca ha tenido novio
+
+table(data$P12_4, useNA="ifany") #hijos
+
+#P12_11
+# 1 - se embarazó y la obligaron a casarse?
+# 2 - se embarazó y decidieron casarse o vivir juntos?
+# 3 - se la "robaron" en contra de su voluntad y tuvo que casarse o unirse?
+# 4 - a cambio de dinero, regalos o propiedades sus padres arreglaron su matrimonio o unión?
+# 5 - quería irse o salirse de su casa?
+# 6 - así lo quisieron y decidieron los dos?
+# 7 - Otra
+# b - blanco
+
+tab <- table(data$P12_11, data$T_INSTRUM, useNA="ifany") #Crear nuestra tabla pero ya con dos 
+#dos variables. En este caso, si la mujer fue golpeada, y el estado civil de la mujer. 
+prop.table(tab, margin=2) #Crear una tabla pero de proporciones donde 
+
+#De hacerlo al revés...
+
+tab <- table(data$T_INSTRUM, data$P12_11, useNA="ifany")
+tab2 <- prop.table(tab, margin=1) #Crear una tabla pero de proporciones donde 
+
+
+#La probabilidad de casarse felizmente, dado que estás casada es del 86% 
+
+#Nueva variable: Si la golpeó alguna de sus parejas o esposos anteriores
+# 1 - Sí
+# 2 - No
+# 9 - No especificado
+# b - blanco
+
+tab <- table(data$P12_17_1)
+prop.table(tab) # Notación científica
+round(prop.table(tab), 3) #Redondeado tres cifras decimales
+
+# Si la golpeó dependiendo de si el el último novio o pareja estaba 
+
+# 1 - soltero?
+# 2 - casado o unido?
+# 3 - separado o divorciado?
+# 4 - viudo?
+# 8 - No sabe
+# b - blanco
+
+# AGRESION
+table(data$P12_17_1, useNA="ifany") #Agresion
+tab <- table(data$P12_17_1, data$T_INSTRUM)
+tab <- tab[-3, -6]
+round(prop.table(tab, margin=2), 3)
+chisq.test(tab)
+
+###### Depende de la pareja?
+
+tab <- table(data$P12_17_1, data$P12_C_4, useNA="ifany")
+round(prop.table(tab, margin=2), 3)
+
+#La hipótesis nula de la xi cuadrada es que no hay diferencia entre las parejas
+# Cuestionario AMAI NSE
+
+chisq.test(tab[-3,-c(6,7)]) #aquí estamos quitando ciertas filas y columnas
+
+
+test <- chisq.test(tab[-3,c(1,4)]) #aquí estamos quitando ciertas filas y añadiendo columnas
+test2 <- chisq.test(tab[-3,c(2,4)]) #aquí estamos quitando ciertas filas y añadiendo columnas
+
+names(test)
+round(test$p.value, 3)
+
+#¿Cómo se hacen las muestras INEGI?
+
+#Listado de áreas, AGEB y distritos electorales : mínima área
+# Las personas que viven en un lugar, tienden a tener ciertas condiciones similares
+# La muestra se minimiza si hay alta correlación . Los cuadros se llaman conglomerados
+#Conglomerados, estratos y factores de expansión son elementos de las características del diseño
+
+library(survey)
+
+#Factor vivienda
+#factor de la mujer
+#Estrato
+#UPM de diseño: conglomerado
+#Estrato de diseño
+
+disenio <- svydesign(~UPM_DIS, strata=~EST_DIS, weight=~FAC_MUJ, data=data)
+
+
+#En una variable dicotómica: 1 o 1 0 1 el porcentaje es 
+tmp <- svymean(~as.factor(data$T_INSTRUM), disenio, na.rm=TRUE) 
+tab <- prop.table(table(data$T_INSTRUM)) #si son distintas
+
+#Consistencfia externa: en la población se refleje en la población mayor
+#Alguno de los parejas anteriores durante su relación o después de separarse la agredió?
+
+foo <- svyby(~P12_17_1, ~subset(P12_C_4, P12_C_4!=9), disenio, svymean, na.rm=TRUE)  # El signo de exclamaci{on elimina No hace falta poner el as.factor como el de 
+table(data$P12_C_4, data$P12_17_1)
+
+foo <- svyby(~P12_17_1, ~subset(P12_C_4, P12_C_4!=9), disenio, svymean, na.rm=TRUE)  # El signo de exclamaci{on elimina No hace falta poner el as.factor como el de 
+
+print(foo)
+confint(foo)
+
+foo <- svyby(~P12_17_1, ~subset(P12_C_4, P12_C_4!=9), disenio, svymean, na.rm=TRUE)
+print(foo)
+confint(foo)
+
+#Cómo aplicar una prueba de hipótesis
+
+tab <- svytable(~data$P12_17_1 + P12_C_4, disenio)
+tab <- tab[-3,-6]
+chisq.test(tab)
